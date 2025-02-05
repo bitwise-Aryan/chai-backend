@@ -2,9 +2,10 @@
   "name": "chai-backend",
   "version": "1.0.0",
   "description": "chai aur backend",
+  "type": "module",
   "main": "notes.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "nodemon src/index.js"
   },
   "keywords": [
     "javascript",
@@ -14,5 +15,8 @@
     "code"
   ],
   "author": "Aryan",
-  "license": "ISC"
+  "license": "ISC",
+  "devDependencies": {
+    "nodemon": "^3.1.9"
+  }
 }
