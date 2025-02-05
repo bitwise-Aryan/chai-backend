@@ -34,7 +34,7 @@
         ->cd ..
 
         ->touch app.js constants.js index.js
-nodemon--(npm i -D nodemon )
+nodemon--(npm i -D nodemon )-D for dev depandancy
         jaise hi file save hoti h server ko restart krdeta h
         dev dependancy-wo dependancy jo hm devlopment ke sme use krte h main prdn mein nhi lejate h
         ise file ka size kch bhi ho hme frk nhi pta
@@ -60,4 +60,7 @@ utils->utlities--->>hm jb kam krenge to hme dher sari utilities lgegi,like file 
         eg:file upload(ek utility h)hm apne user se profile mein bhi krwaoge video mein bhi,mail ki utility
 
         jo fn bar bar repeat hogi usko utility folder mein jb jb suvidha hoga utha lenge 
+
+
+
            
