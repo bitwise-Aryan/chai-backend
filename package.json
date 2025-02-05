@@ -1,0 +1,18 @@
+{
+  "name": "chai-backend",
+  "version": "1.0.0",
+  "description": "chai aur backend",
+  "main": "notes.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "javascript",
+    "backend",
+    "chai",
+    "aur",
+    "code"
+  ],
+  "author": "Aryan",
+  "license": "ISC"
+}
