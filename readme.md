@@ -63,4 +63,17 @@ utils->utlities--->>hm jb kam krenge to hme dher sari utilities lgegi,like file 
 
 
 
+
+
+How to connect database in MERN with debugging?
+        we will use mongoDb database,we will use online one
+        db connection 2 major trike se hoskta h
+        1.sara ka sara code index file ke through run krane wale h q ki wo (package.json dekh wo main ke andr index.js h iska mtlb jb bhi code run hoga to sbse pehle index.js run hoga),isliye sbkch usme rkh dete h
+                jaise hi fn chalu ho(index.js load ho) to wo fn jisme database cncntn ka code likha ho execute kra de
+
+        2.ek db nam ka ek folder bnate h usme jo bhi cnctn ka fn likhte h aur fir index file mein us fn ko import krwauu aur wha execcute krwauu
            
+.database se jb bhi cnctn baithao tb use try catch or promises bcoz in many cases error comes
+//databases is always in another continent(db se jb bhi kch mangenge to sme lgta h to async await)
+        .async await
+        .try catch,promises
