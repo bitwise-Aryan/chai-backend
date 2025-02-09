@@ -1,11 +1,13 @@
 
 import dotenv from "dotenv"
 import connectDB from "./db/index.js"//connectDb without{ } bcoz at end we used export default connectDB
-
+import express from "express";
 dotenv.config({
     path: './.env'
 })
 
+import {app} from "./app.js"
+// const app=express()
 connectDB()
 .then(()=>{
     app.on("error",(e)=>{//ek event ke lie listen kr rhay error
