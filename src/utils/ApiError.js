@@ -5,7 +5,7 @@ class ApiError extends Error {
         errors = [],
         stack = ""
     ){
-        super(message)
+        super(message)//super does-->	•	Call a parent class constructor.  •	Access parent class methods.
         this.statusCode = statusCode
         this.data = null
         this.message = message
