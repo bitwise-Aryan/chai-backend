@@ -46,7 +46,7 @@ const registerUser= asyncHandler(async (req,res)=>{//imp syntax
 
 
         //check if user already exist or not?
-        const exsistedUser=User.findOne({
+        const exsistedUser=await User.findOne({//debug:missed await//error in postman:Error: User with email or username already exis
             $or:[{username},{email}]
         })
 
@@ -54,10 +54,16 @@ const registerUser= asyncHandler(async (req,res)=>{//imp syntax
             throw new ApiError(409,"User with email or username already exist")
         }
 
+        console.log(req.files);
+        
         //multer given features
         const avatarLocalPath=req.files?.avatar[0]?.path;
-        const coverImageLocalPath=req.files?.coverImage[0]?.path;//ye local paths ho bhi skte h nhi bhi
-
+        // const coverImageLocalPath=req.files?.coverImage[0]?.path;//ye local paths ho bhi skte h nhi bhi
+        //this syntax doent handle cases when we send no cover image as avatar is bein explicitly being checked but this not-->>so it may give error
+        let coverImageLocalPath;
+        if(req.files && Array.isArray(req.files.coverImage) && req.files.coverImage.length>0){
+            coverImageLocalPath=req.files.coverImage[0].path
+        }
         if(!avatarLocalPath){
             throw new ApiError(400,"Avatar file is required")
         }
