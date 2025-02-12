@@ -294,12 +294,187 @@ const refreshAccessToken=asyncHandler(async(req,res)=>{
 })
 
 
+const changeCurrentPassword=asyncHandler(async(req,res)=>{
+    const {oldPassword,newPassword,confirmPassword}=req.body//sbse pehle hmne le liya ki hme request se kya kya chahiye
+    //waise to newPassword===confirmPassword ye frontend mein hi hojata h//mgr koi na yha bhi krlenge
+    if(newPassword!=confirmPassword){
+        throw new ApiError(401,"newPassword & confirmPassword should be same")
+    }
+    const user=await User.findById(req.user?._id)//simce authmiddleware chla h,usme hmne req mein user property add krdia tha after removing psswd and refreshToken
+    // const password=user.password  // ye hme password nhi deskta q ki ye hmne hta diya tha const user=await User.findById(decodedToken?._id).select("-password -refreshToken")
+
+    const isPasswordCorrect=await user.isPasswordCorrect(oldPassword)//myhd bnaya tha user.models mein login user mein bhi use huwa h
+    if(!isPasswordCorrect){
+        throw new ApiError(400,"Invalid oldPassword")
+    }
+
+    user.password=newPassword
+    //usr.models mein save wala apart chlega q ki !this.password wala chelga,agr modification nhi h to return krdo nhi to bcrypt krDo hash wash hojaega apna
+    await user.save({validateBeforeSave:false})//since ye sare db  related h
+
+    return  res
+    .status(200)
+    .json(new ApiResponse(200,{},"Password changed successfully"))
+
+    
+
+})
+
+
+const getCurrentUser=asyncHandler(async(req,res)=>{
+    //firse whi bat jb hmne auth likha tha verifyJWT tb req.user mein pura user dal diya tha
+    //In user.routes.js, we first pass the authentication middleware (auth or verifyJWT), then execute getCurrentUser.
+    //wha se verify hojata h ki user loggedIn h ya nhi
+     return res.status(200).json(new ApiResponse(200,req.user,"Current User fetched Successfully"))
+})
+
+//it depends on the backeEnd developer what are the things they allow to change,for eg utube doesnt give us permission to change our username
+
+//note data update krna h to ye mthd use kro,mgr its a good practice that if we want to update file wgera to unka alg sa mthd bna lo for eg:profile photo update krwana h to whi option dedo update ka
+const updateAccountDetails=asyncHandler(async(req,res)=>{
+    //ise pehle verifyJWT to dalenge hi h ki shi user logged in h ya nhi,to req.user mein user aajayega np
+    const{fullName,email}=req.body
+    if(!(fullName || email)){//both r empty
+        throw new ApiError(401,"Both fullName and email cannot be empty")
+    }
+
+    /* 
+        one way to save:
+
+        const user=req.user
+        if(fullName)user.fullName=fullName
+        if(email)user.email=email//imp to ensure ,if(email)
+        await user.save();
+
+
+        // •	.save() is explicitly called to save the document.
+	// •	The pre-save hook runs automatically to modify the password before saving.
+    //the save return in pre save is always runed before .save() if password is modified it encrypts the new password
+    //else dont
+
+    */
+    const user=await User.findByIdAndUpdate(
+        req.user?._id,
+            {
+                $set:{
+                    fullName:fullName,
+                    email
+                }
+            }
+        ,
+        {new:true}//new ke wjh se update hone ke bad wali information return hoti h isliye save kra
+    ).select("-password")
+
+    return  res
+    .status(200)
+    .json(
+            new ApiResponse(200,user,"Account updated Successfully")
+    )
+
+})
+
+
+//if we update files?see notes and learn abt avatar(field name,can be given any name not necessarily avatar)
+
+const updateUserAvatar=asyncHandler(async(req,res)=>{//ise pehle bhi verifyJwt,to req.user mein to aahigya h id
+    const avatarLocalPath=req.file?.path;//note yha pe .file use krhay not .files as yha pe sirf AvatarLocalPath ka bat horha bs upr coverImages ka bhi horha tha
+    if(!avatarLocalPath){
+        throw new ApiError(401,"Avatar file is needed")
+    }
+
+    const avatar=await uploadonCloudinary(avatarLocalPath)
+
+    if(!avatar.url){//agr cloudinary url nhi diya to
+        throw new ApiError(401,"Error while uploading on avatar")
+    }
+
+    /*
+
+🔹 Difference Between req.file and req.files,ye sb routes mein apun add kr denge to add multer middleware,we will use upload
+Upload Type         	                                Multer Method	                                                    Property Added
+Single File	                                            upload.single('fieldname')	                                        req.file (Object)
+Multiple Files (Same Field)	                            upload.array('fieldname', maxCount)	                                req.files (Array)
+Multiple Files (Different Fields)	                    upload.fields([{ name: 'field1' }, { name: 'field2' }])	            req.files (Object with arrays)
+    
+    
+    */
+
+
+    const user=await User.findByIdAndUpdate(
+        req.user?._id,
+        {
+            $set:{
+                avatar:avatar.url//hme jo mila h wo avatar ek pura obj mila h mgr hme model mein sirf url save krna h
+            }
+        }
+    ).select("-password")
+
+    /*
+    //another way
+    // const user = await User.findById(req.user._id);
+    // if (!user) {
+    //     throw new ApiError(404, "User not found");
+    // }
+
+    // // Update the avatar field
+    // user.avatar = avatar;
+
+    // // Save the changes
+    // await user.save();
+    */
+
+
+    return res
+    .status(200)
+    .json(
+        new ApiResponse(201,user,"Successfully updated User Avatar")
+    )
+
+})
+
+
+//for coverImage
+
+const updateCoverImage=asyncHandler(async(req,res)=>{
+    const coverImageLocalPath=req.file?.path
+    if(!coverImageLocalPath){
+        throw new ApiError(400,"Invalid coverImage path")
+    }
+
+    const updatedCoverImage=await uploadonCloudinary(coverImageLocalPath)
+    if(!updatedCoverImage.url){
+        throw new ApiError(400,"Something went wrong on updating coverImage on cloudinary")
+    }
+    const user=await User.findByIdAndUpdate(
+        req.user?._id,
+        { 
+            $set:{
+                coverImage:updatedCoverImage.url//bcoz cloudinary hme object deta h
+            }
+        },
+        {
+            new:true
+        }
+    ).select("-password")
+
+    return res
+    .status(200)
+    .json(
+        new ApiResponse(200,user,"successfully updated coverImage")
+    )
+})
 
 export {
     
     registerUser,
     loginUser,
     logoutUser,
-    refreshAccessToken
+    refreshAccessToken,
+    changeCurrentPassword,
+    getCurrentUser,
+    updateAccountDetails,
+    updateUserAvatar,
+    updateCoverImage
+
 
 }
