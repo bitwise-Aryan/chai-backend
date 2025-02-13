@@ -4,6 +4,7 @@ import { User } from "../models/user.model.js";
 import { uploadonCloudinary } from "../utils/cloudinary.service.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import jwt from "jsonwebtoken"
+import mongoose from "mongoose";
 // import cookieParser from "cookie-parser";
 
 const generateAccessAndRefreshToken=async (userId)=>{
@@ -435,7 +436,7 @@ Multiple Files (Different Fields)	                    upload.fields([{ name: 'fi
 
 //for coverImage
 
-const updateCoverImage=asyncHandler(async(req,res)=>{
+const updateUserCoverImage=asyncHandler(async(req,res)=>{
     const coverImageLocalPath=req.file?.path
     if(!coverImageLocalPath){
         throw new ApiError(400,"Invalid coverImage path")
@@ -464,6 +465,199 @@ const updateCoverImage=asyncHandler(async(req,res)=>{
     )
 })
 
+const getUserChannelProfile=asyncHandler(async(req,res)=>{
+    const{username}=req.params//url se username exteact krlia
+    //check username h bhi ki nhi url mein
+    if(!username?.trim()){//trim leading aur ending spaces ko hta deta h
+        throw new ApiError(400,"Username is missing")
+    }
+    //we can do like this but niche dekho
+    // User.find({username})//	•	username is a string extracted from req.params, not an Object ID.//•	If you were using findById(), it wouldn’t work // we dont need findone as username is unique//firstone return first occurence in db
+	
+    //const channel se hmne filter krliya h ek document,niche wale mthd se
+    const channel=await User.aggregate([//User.aggregate jo bhi field add krenge user mein jaega,local id hmesa User ka hi hoga
+        {
+            $match:{
+                username:username?.toLowerCase()//sare ek username walo ka document bn gya//for eg:chai aur code jiska jiska username h wo bn gya
+            }
+        },
+        {//no of subscriber
+            $lookup:{
+                from:"subscriptions",//in MongoDb lowerCase aur plural hokr store hote h models
+                localField:"_id",
+                foreignField:"channel",//channel ko select kr lenge ie chai aur code ketne doc mein channel h,we will get no of subscriber  
+                as:"subscribers"
+            }
+        },
+        {//no to which this channel/user has subscribed
+
+            //must read point to note
+            //point to note:in subscription model in subscriber field we will have userid of who has subscribed that particular channel by matching the id of users to documents in which subscriber has same id that of user we can filter out the no of channels whose subscriber is the given channel while in case to find no of subscriber we have to match the id with channels(note id of user will be used as channel id in diff document therefore matching the user id with channe id will give us no of subscriber and matching user id with subscriber will give us no of subscribed)
+            $lookup:{
+                from:"subscriptions",//in MongoDb lowerCase aur plural hokr store hote h models
+                localField:"_id",
+                foreignField:"subscriber",
+                as:"subscriberdTo"
+            }
+        },
+        {//now we have to add these fields
+            $addFields:{
+                subscribersCount:{
+                    $size:"$subscribers"//user dollar q ki subscribers ab ek field h//ye line 488 wala subscribers h
+                },
+                channelsSubscribedToCount:{
+                    $size:"$subscribedTo"
+                },
+                isSubscribed:{//subscribe button subscribed mein change backend se true false frontend wala smbhalega
+                    $cond:{//cond mein usually teen param hote h,if then else
+
+                        //hme dekhna h ki jo document subscribers hmare pas aaya h usme mein hun ya nhi
+                        //operator:$in ye hme array or object dono mein khoj kr de deta h
+                        //agr hm loggedIn honge to hmare pas req.user property hogi
+                        //to dekho lo wo subscribers mein h ya nhi ab q ki subscribers ek field h therefore dollar sign
+                        //$subscribers.subscriber,bcz user .model  mein wo subscriber hi to h
+                        if:{$in:[req.user?._id,"$subscribers.subscriber"]},
+                        then:true,
+                        else:false
+                    }
+                }
+            }
+        },
+        {//last pipeline:project it will give the desired values to frontend//sari values dene ki jrurt nhi hoti befaltu ka size bdhta h dat aka
+            $project:{
+                fullName:1,
+                username:1,
+                subscribersCount:1,
+                channelsSubscribedToCount:1,
+                isSubscribed:1,
+                avatar:1,
+                coverImage:1,
+                email:1
+                //if we want to give when was channel created give created at also
+            }
+        }
+    ])
+
+
+
+
+            //see what we will get op?we wil get op like [{}],ie array ke andr ek hi object hoga as we have matched with user aur db mein sirf ek hi ka nam user h
+        //op aisa bhi hoskta h [{},{},{}......]
+
+        if(!channel?.length){
+            throw new ApiError(404,"Channel does not exist")
+        }
+
+        //we may return array as getUserChProfile(channel jo andr def  huwa h) mein hme ye milega [{user:,}]
+        //mgr q ki hme sirf ek hi obj mila h usme to frontend walo ka kam asan krne ke lie just return that obj
+
+        return res
+        .status(200)
+        .json(
+            new ApiResponse(200,channel[0],"User Channel fetched successfully")
+        )
+
+})
+
+
+//in nxt video history
+//nested lookups
+const getWatchHistory=asyncHandler(async(req,res)=>{
+    //interview part ,req.user._id-->>mein hme mangoDb user mein dekho ek string hota h,wo actual mongoDb id nhi h uske lie hme ObjectId('wo string'),ab q ki hmlog mongoose ka use kr rhay isliye wo ye sb kam hmare lie behind the back kr deta h
+    //req.user._id ek string milta h
+    //aggregation pipleine ke sare code mein mongoose wo kam nhi kr pata h isliye hme hi convert krna pdega
+    
+    const user=await User.aggregate([
+        {
+            // The given aggregation pipeline filters the User collection and returns the document(s) where the _id matches req.user._id.
+            // in most cases, user will contain only one user document in an array because _id is unique in MongoDB (it’s the primary key)
+            $match:{//ye match krne ke bad hme user model milgya h 
+                _id:new mongoose.Types.ObjectId(req.user._id)
+            }
+        },
+        {
+            //now we have to lookup inside its watchHistory
+
+
+            /*
+                key points must read?akhir kya hota h ObjectId ke andr array mein hmesa videoId store hota rehta h
+
+                Key Points
+                    1.	Before $lookup
+                    •	The watchHistory in the users collection only stores video _ids.
+                    •	No actual video details are stored in the users collection.
+                    2.	During $lookup Execution
+                    •	MongoDB matches the _ids from videos with watchHistory dynamically.
+                    •	The result includes full video details, but only in the query output, not in the database.
+                    3.	After Query Execution
+                    •	The data is not permanently stored in the users collection.
+                    •	If you run the query again, MongoDB will recompute the $lookup results.
+                    •	To store the joined data permanently, you would need to save the query output into another collection using $out or $merge.
+            
+            
+            Since _id is always present in MongoDB collections, your $lookup uses it as the primary key when matching documents.
+            id hmne users mein bhi nhi bnaya h model dekho
+            _id hmesa MongoDb:MongoDB automatically assigns _id to every document, even if you don’t define it in the schema.
+            */
+            $lookup:{
+                form:"videos",//kha se jorne ka material lae
+                localField:"watchHistory",//// Field in users collection (Array of ObjectIds)//kha pe jorna h user ke andr
+                foreignField:"_id",// // Field in videos collection (Primary Key)//automatically given by MongoDb
+                as:"watchHistory",
+                //sub pipelines
+                pipeline:[
+                    {
+                        from:"users",
+                        localField:"owner",
+                        foreignField:"_id",
+                        as:"owner",//hm owner se sare details nhi dena chahte hso we will use again a pipeline project
+                        pipeline:[
+                            {
+                                $project:{
+                                    fullName:1,
+                                    username:1,
+                                    avatar:1
+                                }
+                            }
+                        ]
+                    },
+                    {//ek aur further pipeline, kya kya kiya abhi tk?ek lookup fir uske andr ek  sublookup aur fir project krke as:"owner" mein sara detail dal diya
+                        //sara data,owner ke field mein h aur wo as array aaya h
+                        //ab jobhi kr rhay h apna frontend sudharne ke lie kr rhay h
+                        //agr ye nhi kre to owner[0] mein sara detail:jo jo project kiye h wo aajayega
+                        $addFields:{
+                            owner:{//yha hmlog owner field of video ko overwrite kr rhay h
+                                $first:"$owner"//first q ki as:"owner" field ka pehla value nikal rhay aur $q ki wo field h
+                                //ab frontend mein usko ek object milega sirf owner jise wo .username krke sari values nikal lega
+                            }
+                        }
+                    }
+                ]
+            }
+        /*watchHistory: [//watchHistory aise define huwa tha to bs hm id aur ref de denge to wo videos ko select krlega
+            {
+                type: Schema.Types.ObjectId,
+                ref: "Video"
+            }
+        ] 
+        */
+        }
+
+    ])
+
+
+    return res
+    .status(200)
+    .json(
+        new ApiResponse(
+            200,
+            user[0].watchHistory,
+            "Watch History fetched successfully"
+        )
+    )
+})
+
+
 export {
     
     registerUser,
@@ -474,7 +668,9 @@ export {
     getCurrentUser,
     updateAccountDetails,
     updateUserAvatar,
-    updateCoverImage
+    updateUserCoverImage,
+    getUserChannelProfile,
+    getWatchHistory
 
 
 }
